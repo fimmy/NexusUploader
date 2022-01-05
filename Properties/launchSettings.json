@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NexusUploader": {
+      "commandName": "Project",
+      "commandLineArgs": "-r http://localhost:8081 -t maven -n maven-releases"
+    }
+  }
+}
