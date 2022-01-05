@@ -38,9 +38,9 @@ return app.Execute(args);
 
 async Task uploadMavenAsync(CancellationToken cancellationToken, string dir, string host, string repoName, string user, string password)
 {
-    var jarFiles = Directory.EnumerateFiles(dir, "*.jar", SearchOption.AllDirectories);
-    Console.WriteLine($"Total jar file count: {jarFiles.Count()}");
-    if (jarFiles.Any())
+    var pomFiles = Directory.EnumerateFiles(dir, "*.pom", SearchOption.AllDirectories);
+    Console.WriteLine($"Total jar file count: {pomFiles.Count()}");
+    if (pomFiles.Any())
     {
         if (string.IsNullOrEmpty(user))
         {
@@ -51,38 +51,44 @@ async Task uploadMavenAsync(CancellationToken cancellationToken, string dir, str
             password = Prompt.GetPassword("Nexus Password: ");
         }
 
-        foreach (var jarFileFullPath in jarFiles)
+        foreach (var pomFileFullPath in pomFiles)
         {
-            Console.WriteLine($"uploading file: {jarFileFullPath}");
-            var jarFileInfo = new FileInfo(jarFileFullPath);
-            var jarFileName = jarFileInfo.Name;
-            var jarFileNameWithoutExt = Path.GetFileNameWithoutExtension(jarFileName);
-            var pomFileName = $"{jarFileNameWithoutExt}.pom";
-            var pomFileFullPath = Path.Combine(jarFileInfo.DirectoryName ?? "", pomFileName);
+            Console.WriteLine($"uploading pom file: {pomFileFullPath}");
             var pomFileInfo = new FileInfo(pomFileFullPath);
-            if (pomFileInfo.Exists)
+            var pomFileName = pomFileInfo.Name;
+            var pomFileNameWithoutExt = Path.GetFileNameWithoutExtension(pomFileName);
+            var jarFileName = $"{pomFileNameWithoutExt}.jar";
+            var jarFileFullPath = Path.Combine(pomFileInfo.DirectoryName ?? "", jarFileName);
+            var jarFileInfo = new FileInfo(jarFileFullPath);
+            var request = host.AppendPathSegment("/service/rest/v1/components").SetQueryParams(new
             {
-                var response = await host.AppendPathSegment("/service/rest/v1/components").SetQueryParams(new
-                {
-                    repository = repoName
-                }).AllowAnyHttpStatus().WithBasicAuth(user, password).PostMultipartAsync(mp =>
-                    mp.AddString("maven2.asset1.extension", "jar")
-                    .AddFile("maven2.asset1", jarFileFullPath)
-                    .AddString("maven2.asset2.extension", "pom")
-                    .AddFile("maven2.asset2", pomFileFullPath), cancellationToken);
-                if (response.StatusCode == 204)
-                {
-                    Console.WriteLine($"upload success: {await response.GetStringAsync()}");
-                }
-                else
-                {
-                    Console.WriteLine($"upload failed:{response.StatusCode}-{await response.GetStringAsync()}");
-                }
+                repository = repoName
+            }).AllowAnyHttpStatus().WithBasicAuth(user, password);
+            IFlurlResponse response;
+            if (jarFileInfo.Exists)
+            {
+                Console.WriteLine($"uploading jar file: {jarFileFullPath}");
+                response = await request.PostMultipartAsync(mp =>
+                mp.AddString("maven2.asset1.extension", "jar")
+                .AddFile("maven2.asset1", jarFileFullPath)
+                .AddString("maven2.asset2.extension", "pom")
+                .AddFile("maven2.asset2", pomFileFullPath), cancellationToken);
             }
             else
             {
-                Console.WriteLine($"{pomFileFullPath} not exist, skip upload");
+                response = await request.PostMultipartAsync(mp =>
+                  mp.AddString("maven2.asset1.extension", "pom")
+                  .AddFile("maven2.asset1", pomFileFullPath), cancellationToken);
             }
+            if (response.StatusCode == 204)
+            {
+                Console.WriteLine($"upload success {await response.GetStringAsync()}");
+            }
+            else
+            {
+                Console.WriteLine($"upload failed:{response.StatusCode}-{await response.GetStringAsync()}");
+            }
+
 
         }
     }
@@ -118,7 +124,7 @@ async Task uploadNpmAsync(CancellationToken cancellationToken, string dir, strin
                 mp.AddFile("npm.asset", tgzFileFullPath), cancellationToken);
             if (response.StatusCode == 204)
             {
-                Console.WriteLine($"upload success: {await response.GetStringAsync()}");
+                Console.WriteLine($"upload success {await response.GetStringAsync()}");
             }
             else
             {
