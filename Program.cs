@@ -29,6 +29,9 @@ app.OnExecuteAsync(async cancellationToken =>
         case RepoType.npm:
             await uploadNpmAsync(cancellationToken, path.ParsedValue, host.ParsedValue, repoName.ParsedValue, user.ParsedValue, password.ParsedValue);
             break;
+        case RepoType.nuget:
+            await uploadNugetAsync(cancellationToken, path.ParsedValue, host.ParsedValue, repoName.ParsedValue, user.ParsedValue, password.ParsedValue);
+            break;
         default:
             break;
     }
@@ -139,8 +142,49 @@ async Task uploadNpmAsync(CancellationToken cancellationToken, string dir, strin
     }
 }
 
+async Task uploadNugetAsync(CancellationToken cancellationToken, string dir, string host, string repoName, string user, string password)
+{
+    var nupkgFiles = Directory.EnumerateFiles(dir, "*.nupkg", SearchOption.AllDirectories);
+    Console.WriteLine($"Total nupkg file count: {nupkgFiles.Count()}");
+    if (nupkgFiles.Any())
+    {
+        if (string.IsNullOrEmpty(user))
+        {
+            user = Prompt.GetString("Nexus User Name: ") ?? "";
+        }
+        if (string.IsNullOrEmpty(password))
+        {
+            password = Prompt.GetPassword("Nexus Password: ");
+        }
+
+        foreach (var nupkgFileFullPath in nupkgFiles)
+        {
+            Console.WriteLine($"uploading file: {nupkgFileFullPath}");
+
+            var response = await host.AppendPathSegment("/service/rest/v1/components").SetQueryParams(new
+            {
+                repository = repoName
+            }).AllowAnyHttpStatus().WithBasicAuth(user, password).PostMultipartAsync(mp =>
+                mp.AddFile("nuget.asset", nupkgFileFullPath), cancellationToken);
+            if (response.StatusCode == 204)
+            {
+                Console.WriteLine($"upload success {await response.GetStringAsync()}");
+            }
+            else
+            {
+                Console.WriteLine($"upload failed:{response.StatusCode}-{await response.GetStringAsync()}");
+            }
+
+        }
+    }
+    else
+    {
+        Console.WriteLine("No any nupkg package");
+    }
+}
 public enum RepoType
 {
     maven,
-    npm
+    npm,
+    nuget
 }
