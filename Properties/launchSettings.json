@@ -3,6 +3,11 @@
     "NexusUploader": {
       "commandName": "Project",
       "commandLineArgs": "-r http://localhost:8081 -t maven -n maven-releases"
+    },
+    "WSL": {
+      "commandName": "WSL",
+      "distributionName": "",
+      "commandLineArgs": "NexusUploader.dll -r http://localhost:8081 -t maven -n maven-releases"
     }
   }
 }
